@@ -7,11 +7,16 @@ import json
 import re
 from collections import defaultdict
 
-parser = argparse.ArgumentParser(description="Parse jellyfish dumps file and discard singletons/low coverage")
-parser.add_argument("--input", "-i", help="Dumps file", action="store")
-parser.add_argument("--histo", help="File to store histogram of k-mer counts", default="counts_histo.json")
-parser.add_argument("--cutoff", type=int, default=2, help="Cutoff (inclusive) for k-mer coverage to include")
-parser.add_argument("--output", "-o", default="counts_kmers.json", help="Output file containing kmers and counts above cutoff")
+parser = argparse.ArgumentParser(
+    description="Parse jellyfish dumps file and discard singletons/low coverage")
+parser.add_argument("--input", "-i",
+    help="Dumps file", action="store")
+parser.add_argument("--histo",
+    help="File to store histogram of k-mer counts", default="counts_histo.json")
+parser.add_argument("--cutoff", type=int, default=2,
+    help="Cutoff (inclusive) for k-mer coverage to include")
+parser.add_argument("--output", "-o", default="counts_kmers.json",
+    help="Output file containing kmers and counts above cutoff")
 
 args = parser.parse_args()
 
