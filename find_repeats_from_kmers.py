@@ -7,17 +7,23 @@ from statistics import pstdev, mean
 from collections import defaultdict
 import argparse
 
-parser = argparse.ArgumentParser("Identify repeat elements from k-mer counts")
-parser.add_argument("--counts", "-c", help="Dict of counts per k-mer, in JSON format")
-parser.add_argument("--output", "-o", help="Prefix for output files", default="repeat_info")
-parser.add_argument("--maxzeroes", type=int, default=1, help="Maximum number zero-count expected k-mers to allow in reporting repeats")
+parser = argparse.ArgumentParser(
+    "Identify direct tandem repeat elements from k-mer counts")
+parser.add_argument("--counts", "-c",
+    help="Dict of counts per k-mer, in JSON format")
+parser.add_argument("--output", "-o",
+    help="Prefix for output files", default="repeat_info")
+parser.add_argument("--maxzeroes", type=int, default=1,
+    help="Maximum number zero-count expected k-mers to allow in reporting repeats")
+parser.add_argument("-k", type=int, default=19,
+    help="K-mer length used for counting, should be prime")
 args = parser.parse_args()
 
 # functions -----------------------------------------------------------------------
 
 def get_repeat_frame(seq: str, frame = 1):
     """Find tandem repeat length within sequence.
-    
+
     Returns:
     tuple of repeat length (int) and repeat sequence (str)
 
@@ -42,7 +48,7 @@ def recurse_repeat_arr(seq:str, seqs = []):
 
 def get_canonical_repeat(seq: str):
     """For a tandem repeat element, report its canonical form.
-    
+
     The canonical form of a repeat is the sequence in a reading frame and
     strand that minimizes the lexicographical sort order.
     """
@@ -82,75 +88,56 @@ def get_expected_kmers_from_repeat(seq: str, k: int, canonical=True):
 
 # main ----------------------------------------------------------------------
 
-# read dict containing k-mer counts
-with open(args.counts, "r") as fh:
-    cnts = json.load(fh)
+if __name__ == "__main__":
+    # read dict containing k-mer counts
+    with open(args.counts, "r") as fh:
+        cnts = json.load(fh)
 
-# reverse-sort k-mers by counts
-cnts_sort = sorted(cnts, key=cnts.get, reverse=True)
-print(f'Total of {len(cnts_sort)} k-mers in input')
+    # reverse-sort k-mers by counts
+    cnts_sort = sorted(cnts, key=cnts.get, reverse=True)
+    print(f'Total of {len(cnts_sort)} k-mers in input')
 
-# write output files
-outjson = args.output + ".kmers.json"
-outtbl = args.output + ".report.tsv"
+    # write output files
+    outjson = args.output + ".kmers.json"
+    outtbl = args.output + ".report.tsv"
 
-fh = open(outtbl, "w")
-fh.write("\t".join(['repeat','total','cv','zeroes']) + "\n") # header
+    fh = open(outtbl, "w")
+    fh.write("\t".join(['repeat','total','cv','zeroes']) + "\n") # header
 
-# process k-mers 
-out = defaultdict(lambda: defaultdict (int))
-tracker = dict(zip(cnts_sort,([0]*len(cnts_sort))))
-counter=0
-for kmer in cnts_sort:
-    counter += 1
-    if counter % 100000 == 0:
-        print(f'Processed {counter} k-mers from input')
-    if tracker[kmer] == 0: # avoid kmers already processed
-        (replen, rep) = get_repeat_frame(kmer)
-        if replen < 19: # ignore sequences that are evidently not repeats
-            rep = get_canonical_repeat(rep)
-            outrec = {}
-            expected_kmers = get_expected_kmers_from_repeat(rep, 19)
-            for kk in expected_kmers:
-                try:
-                    # out[rep][kk] = cnts[kk]
-                    outrec[kk] = cnts[kk]
-                    tracker[kk] += 1
-                except KeyError: 
-                    # out[rep][kk] = 0
-                    outrec[kk] = 0
-            if list(outrec.values()).count(0) < int(args.maxzeroes):
-                out[rep] = outrec
-                fh.write("\t".join([rep,
-                                    str(sum(outrec.values())),
-                                    str(pstdev(outrec.values()) / mean(outrec.values())),
-                                    str(list(outrec.values()).count(0))
-                                    ])
-                          + "\n")               
+    # process k-mers
+    out = defaultdict(lambda: defaultdict (int))
+    tracker = dict(zip(cnts_sort,([0]*len(cnts_sort))))
+    counter=0
+    for kmer in cnts_sort:
+        counter += 1
+        if counter % 100000 == 0:
+            print(f'Processed {counter} k-mers from input')
+        if tracker[kmer] == 0: # avoid kmers already processed
+            (replen, rep) = get_repeat_frame(kmer)
+            if replen < args.k: # ignore sequences that are evidently not repeats
+                rep = get_canonical_repeat(rep)
+                outrec = {}
+                expected_kmers = get_expected_kmers_from_repeat(rep, args.k)
+                for kk in expected_kmers:
+                    try:
+                        # out[rep][kk] = cnts[kk]
+                        outrec[kk] = cnts[kk]
+                        tracker[kk] += 1
+                    except KeyError:
+                        # out[rep][kk] = 0
+                        outrec[kk] = 0
+                if list(outrec.values()).count(0) < int(args.maxzeroes):
+                    out[rep] = outrec
+                    fh.write("\t".join([rep,
+                                        str(sum(outrec.values())),
+                                        str(pstdev(outrec.values()) / mean(outrec.values())),
+                                        str(list(outrec.values()).count(0))
+                                        ])
+                              + "\n")
 
-fh.close()
+    fh.close()
 
-# dump k-mers for each repeat seq above cutoff into a json file
-print(f'Writing output to file {outjson}')
-with open(outjson, "w") as fh:
-    fh.write(json.dumps(out,indent=2))
-
-"""
-# report counts and coverage
-print(f'Writing output to file {outtbl}')
-with open(outtbl, "w") as fh:
-    fh.write("\t".join(['repeat','total','pstdev','zeroes']) + "\n") # header
-    for rep in out:
-        if list(out[rep].values()).count(0) < int(args.maxzeroes):
-            fh.write("\t".join([rep,
-                                str(sum(out[rep].values())),
-                                str(pstdev(out[rep].values())),
-                                str(list(out[rep].values()).count(0))
-                                ])
-                     + "\n")
-# dump everything into a json file
-print(f'Writing output to file {outjson}')
-with open(outjson, "w") as fh:
-    fh.write(json.dumps(out,indent=2))
-
-"""
+    # dump k-mers for each repeat seq above cutoff into a json file
+    print(f'Writing output to file {outjson}')
+    with open(outjson, "w") as fh:
+        fh.write(json.dumps(out,indent=2))
