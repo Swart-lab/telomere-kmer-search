@@ -12,7 +12,8 @@ count](https://github.com/gmarcais/Jellyfish) before being k-mer sequences and
 counts are dumped to Fasta format. Those above the minimum coverage are then
 retained, and used to search for the most abundant tandem direct repeats. An
 example bash script for this task is given in `do_jellyfish.sh`. These scripts
-have been tested with jellyfish v2.2.10.
+have been tested with jellyfish v2.2.10. Dependencies listed in Conda
+environment file `env.yml`.
 
 NB:
 
